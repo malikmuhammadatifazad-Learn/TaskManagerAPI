@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace TaskManagerAPI.Controllers
 {
@@ -13,25 +14,26 @@ namespace TaskManagerAPI.Controllers
     [Route("api/[controller]")]
     public class TaskController : ControllerBase
     {
-        private static List<TaskItem> tasks = new List<TaskItem>
+        private readonly AppDbContext _context;
+
+        public TaskController(AppDbContext context)
         {
-            new TaskItem { Id = 1, Title = "Buy groceries", IsCompleted = false },
-            new TaskItem { Id = 2, Title = "Learn .NET", IsCompleted = true },
-            new TaskItem { Id = 3, Title = "Apply for jobs", IsCompleted = false }
-        };
+            _context = context;
+        }
 
         // GET all tasks
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
+            var tasks = await _context.Tasks.ToListAsync();
             return Ok(tasks);
         }
 
         // GET single task by id
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var task = tasks.FirstOrDefault(t => t.Id == id);
+            var task = await _context.Tasks.FindAsync(id);
             if (task == null)
                 return NotFound("Task not found");
             return Ok(task);
@@ -39,33 +41,35 @@ namespace TaskManagerAPI.Controllers
 
         // POST create new task
         [HttpPost]
-        public IActionResult Create([FromBody] TaskItem task)
+        public async Task<IActionResult> Create([FromBody] TaskItem task)
         {
-            task.Id = tasks.Max(t => t.Id) + 1;
-            tasks.Add(task);
+            _context.Tasks.Add(task);
+            await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = task.Id }, task);
         }
 
         // PUT update existing task
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] TaskItem updated)
+        public async Task<IActionResult> Update(int id, [FromBody] TaskItem updated)
         {
-            var task = tasks.FirstOrDefault(t => t.Id == id);
+            var task = await _context.Tasks.FindAsync(id);
             if (task == null)
                 return NotFound("Task not found");
             task.Title = updated.Title;
             task.IsCompleted = updated.IsCompleted;
+            await _context.SaveChangesAsync();
             return Ok(task);
         }
 
         // DELETE remove task
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var task = tasks.FirstOrDefault(t => t.Id == id);
+            var task = await _context.Tasks.FindAsync(id);
             if (task == null)
                 return NotFound("Task not found");
-            tasks.Remove(task);
+            _context.Tasks.Remove(task);
+            await _context.SaveChangesAsync();
             return Ok("Task deleted");
         }
     }
